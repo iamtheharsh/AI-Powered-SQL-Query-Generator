@@ -72,6 +72,11 @@ SQL Query:
 
 def execute_query(sql_query):
     try:
+        # Code-level validation to block destructive non-SELECT queries
+        formatted_query = sqlparse.format(sql_query, strip_comments=True).strip().upper()
+        if not (formatted_query.startswith("SELECT") or formatted_query.startswith("WITH") or formatted_query.startswith("PRAGMA")):
+            return {"error": "Security Block: Only read-only queries (SELECT) are allowed."}
+
         with database.engine.connect() as connection:
             result = connection.execute(text(sql_query))
             rows = result.fetchall()
