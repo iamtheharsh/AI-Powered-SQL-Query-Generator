@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import pandas as pd
 
 # FastAPI backend URL
 API_URL = "http://127.0.0.1:8000"
@@ -12,6 +13,8 @@ if "generated_sql" not in st.session_state:
     st.session_state.generated_sql = ""
 if "query_results" not in st.session_state:
     st.session_state.query_results = None
+if "explanation" not in st.session_state:
+    st.session_state.explanation = ""
 if "history" not in st.session_state:
     st.session_state.history = []
 if "uploaded_db_name" not in st.session_state:
@@ -33,9 +36,10 @@ if uploaded_file is not None:
         if upload_response.status_code == 200:
             st.session_state.uploaded_db_name = uploaded_file.name
             st.sidebar.success(f"Connected to: {uploaded_file.name}")
-            # Reset query results and generated SQL for the new database
+            # Reset query results, generated SQL, and explanation for the new database
             st.session_state.generated_sql = ""
             st.session_state.query_results = None
+            st.session_state.explanation = ""
             st.rerun()
         else:
             st.sidebar.error("Error uploading database to backend")
@@ -115,6 +119,27 @@ if st.session_state.history:
 else:
     st.sidebar.write("No queries run yet.")
 
+# Reusable function to display table, download button, and visual charts
+def display_results(results, title="Query Results"):
+    if not results:
+        st.write("No results found.")
+        return
+
+    df = pd.DataFrame(results)
+    st.write(f"### {title}:")
+    st.dataframe(df)
+
+    # Download Button
+    csv_data = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        label="📥 Download results as CSV",
+        data=csv_data,
+        file_name="query_results.csv",
+        mime="text/csv",
+        key=f"dl_{title}"
+    )
+
+
 # Main content area
 if not selected_db:
     st.info("👈 Please select or upload a Database in the sidebar to start generating and executing queries.")
@@ -122,9 +147,10 @@ else:
     st.header("🧠 AI-Powered SQL Generation")
     natural_language_query = st.text_area("Enter your query in plain English:")
     if st.button("⚡ Generate SQL"):
-        # Reset previous generated SQL and results
+        # Reset previous generated SQL, results, and explanation
         st.session_state.generated_sql = ""
         st.session_state.query_results = None
+        st.session_state.explanation = ""
         
         response = requests.post(f"{API_URL}/generate_sql/", params={"natural_language_query": natural_language_query})
         if response.status_code == 200:
@@ -132,25 +158,35 @@ else:
         else:
             st.error("Error generating SQL query")
             
-    # Display generated SQL and one-click run option
+    # Display generated SQL and execution/explanation buttons
     if st.session_state.generated_sql:
         st.code(st.session_state.generated_sql, language='sql')
-        if st.button("🚀 Run Generated Query"):
-            run_response = requests.post(f"{API_URL}/execute_sql/", params={"sql_query": st.session_state.generated_sql})
-            if run_response.status_code == 200:
-                st.session_state.query_results = run_response.json().get("results", [])
-                add_to_history(st.session_state.generated_sql)
-                st.rerun()
-            else:
-                st.error("Error executing query")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 Run Generated Query"):
+                run_response = requests.post(f"{API_URL}/execute_sql/", params={"sql_query": st.session_state.generated_sql})
+                if run_response.status_code == 200:
+                    st.session_state.query_results = run_response.json().get("results", [])
+                    add_to_history(st.session_state.generated_sql)
+                    st.rerun()
+                else:
+                    st.error("Error executing query")
+        with col2:
+            if st.button("💡 Explain Query"):
+                explain_response = requests.post(f"{API_URL}/explain_sql/", params={"sql_query": st.session_state.generated_sql})
+                if explain_response.status_code == 200:
+                    st.session_state.explanation = explain_response.json().get("explanation", "")
+                else:
+                    st.error("Error explaining SQL query")
+
+    # Display explanation if loaded
+    if st.session_state.explanation:
+        st.info(f"### 💡 AI Explanation:\n{st.session_state.explanation}")
                 
     # Display query execution results
     if st.session_state.query_results is not None:
-        if st.session_state.query_results:
-            st.write("### Query Results:")
-            st.dataframe(st.session_state.query_results)
-        else:
-            st.write("No results found.")
+        display_results(st.session_state.query_results, title="AI Query Results")
             
     st.header("🖥️ Execute SQL Query Manually")
     manual_sql_query = st.text_area("Enter custom SQL query to execute:", value=st.session_state.manual_sql_query)
@@ -159,10 +195,6 @@ else:
         if manual_response.status_code == 200:
             manual_results = manual_response.json().get("results", [])
             add_to_history(manual_sql_query)
-            if manual_results:
-                st.write("### Custom Query Results:")
-                st.dataframe(manual_results)
-            else:
-                st.write("No results found.")
+            display_results(manual_results, title="Custom Query Results")
         else:
             st.error("Error executing custom query")

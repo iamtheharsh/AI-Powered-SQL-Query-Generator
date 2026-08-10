@@ -19,10 +19,11 @@ MAX_TABLES = 15
 MAX_COLUMNS_PER_TABLE = 10
 
 def clean_sql_output(response_text):
-    """Extracts SQL query from AI response."""
+    """Extracts SQL query from AI response and formats it."""
     clean_query = re.sub(r"```sql\n(.*?)\n```", r"\1", response_text, flags=re.DOTALL)
     sql_match = re.search(r"SELECT .*?;", clean_query, re.DOTALL | re.IGNORECASE)
-    return sql_match.group(0) if sql_match else clean_query.strip()
+    raw_sql = sql_match.group(0) if sql_match else clean_query.strip()
+    return sqlparse.format(raw_sql, reindent=True, keyword_case='upper')
 
 def get_limited_schema():
     """Fetches a reduced database schema to fit within token limits."""

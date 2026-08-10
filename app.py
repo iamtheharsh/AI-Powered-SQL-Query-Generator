@@ -55,3 +55,15 @@ def upload_db(file: UploadFile = File(...)):
         return {"error": "Failed to set database file"}
     except Exception as e:
         return {"error": str(e)}
+
+# API: Explain SQL query
+@app.post("/explain_sql/")
+def explain_sql(sql_query: str):
+    try:
+        import google.generativeai as genai
+        model = genai.GenerativeModel("gemini-3.5-flash")
+        prompt = f"Explain this SQL query in plain English, step-by-step:\n\n{sql_query}"
+        response = model.generate_content(prompt)
+        return {"explanation": response.text.strip()}
+    except Exception as e:
+        return {"error": str(e)}
