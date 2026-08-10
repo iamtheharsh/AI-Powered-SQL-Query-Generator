@@ -44,26 +44,30 @@ if selected_db and selected_table:
         else:
             st.sidebar.error("Error fetching columns")
 
-st.header("🧠 AI-Powered SQL Generation")
-natural_language_query = st.text_area("Enter your query in plain English:")
-if st.button("⚡ Generate SQL"):
-    response = requests.post(f"{API_URL}/generate_sql/", params={"natural_language_query": natural_language_query})
-    if response.status_code == 200:
-        generated_sql = response.json().get("sql_query", "")
-        st.code(generated_sql, language='sql')
-    else:
-        st.error("Error generating SQL query")
-        
-st.header("🖥️ Execute SQL Query")
-manual_sql_query = st.text_area("Enter SQL query to execute:")
-if st.button("🚀 Run Query"):
-    response = requests.post(f"{API_URL}/execute_sql/", params={"sql_query": manual_sql_query})
-    if response.status_code == 200:
-        results = response.json().get("results", [])
-        if results:
-            st.write("### Query Results:")
-            st.table(results)
+# Main content area
+if not selected_db:
+    st.info("👈 Please enter a Database Name in the sidebar to start generating and executing queries.")
+else:
+    st.header("🧠 AI-Powered SQL Generation")
+    natural_language_query = st.text_area("Enter your query in plain English:")
+    if st.button("⚡ Generate SQL"):
+        response = requests.post(f"{API_URL}/generate_sql/", params={"natural_language_query": natural_language_query})
+        if response.status_code == 200:
+            generated_sql = response.json().get("sql_query", "")
+            st.code(generated_sql, language='sql')
         else:
-            st.write("No results found.")
-    else:
-        st.error("Error executing query")
+            st.error("Error generating SQL query")
+            
+    st.header("🖥️ Execute SQL Query")
+    manual_sql_query = st.text_area("Enter SQL query to execute:")
+    if st.button("🚀 Run Query"):
+        response = requests.post(f"{API_URL}/execute_sql/", params={"sql_query": manual_sql_query})
+        if response.status_code == 200:
+            results = response.json().get("results", [])
+            if results:
+                st.write("### Query Results:")
+                st.table(results)
+            else:
+                st.write("No results found.")
+        else:
+            st.error("Error executing query")

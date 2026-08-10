@@ -1,5 +1,5 @@
 import os
-import openai
+import google.generativeai as genai
 import sqlparse
 import re
 from dotenv import load_dotenv
@@ -10,11 +10,11 @@ from database import engine, list_databases, list_tables, list_columns
 # Load environment variables
 load_dotenv()
 
-# OpenAI API Key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+# Configure Gemini API Key
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 # Limits to avoid token limit issues
-MAX_TABLES = 15  # Increased slightly since SQLite schema metadata is light
+MAX_TABLES = 15
 MAX_COLUMNS_PER_TABLE = 10
 
 def clean_sql_output(response_text):
@@ -24,7 +24,7 @@ def clean_sql_output(response_text):
     return sql_match.group(0) if sql_match else clean_query.strip()
 
 def get_limited_schema():
-    """Fetches a reduced database schema to fit within OpenAI's token limits."""
+    """Fetches a reduced database schema to fit within token limits."""
     schema = {}
     databases = list_databases().get("databases", [])
     for db in databases:
@@ -36,9 +36,8 @@ def get_limited_schema():
     return schema
 
 def generate_sql_query(nl_query):
-    """Converts a natural language query into an optimized SQL query."""
+    """Converts a natural language query into an optimized SQL query using Gemini."""
     schema = get_limited_schema()
-    # Format schema without DB prefix for SQLite
     schema_text = "\n".join([
         f"{table}: {', '.join(columns)}" for db, tables in schema.items() for table, columns in tables.items()
     ])
@@ -49,6 +48,7 @@ You are an SQL expert. Convert the following natural language query into an opti
 - Use indexing where applicable.
 - Prefer JOINS over subqueries.
 - Use GROUP BY for aggregations if needed.
+- Return ONLY the raw SQL query. Do not explain the query.
 
 Database Schema (Limited View):
 {schema_text}
@@ -59,14 +59,10 @@ SQL Query:
 """
 
     try:
-        response = openai.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a SQLite optimization expert."},
-                {"role": "user", "content": prompt}
-            ]
-        )
-        raw_sql_query = response.choices[0].message.content.strip()
+        # Use gemini-3.5-flash as the default model
+        model = genai.GenerativeModel("gemini-3.5-flash")
+        response = model.generate_content(prompt)
+        raw_sql_query = response.text.strip()
         return clean_sql_output(raw_sql_query)
         
     except Exception as e:
