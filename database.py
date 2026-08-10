@@ -15,14 +15,23 @@ SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", "chinook.db")
 # Connection String
 DATABASE_URL = f"sqlite:///{SQLITE_DB_PATH}"
 
-# Create SQLAlchemy engine
-try:
-    logging.debug(f"Connecting to SQLite database at {SQLITE_DB_PATH}")
-    engine = create_engine(DATABASE_URL, echo=True)
-    logging.debug("Database connection successful!")
-except Exception as e:
-    logging.error(f"Database connection failed: {str(e)}")
-    exit()
+# Global engine variable
+engine = None
+
+def set_database_file(db_path: str):
+    global engine, DATABASE_URL
+    DATABASE_URL = f"sqlite:///{db_path}"
+    try:
+        logging.debug(f"Connecting to SQLite database at {db_path}")
+        engine = create_engine(DATABASE_URL, echo=True)
+        logging.debug("Database connection successful!")
+        return True
+    except Exception as e:
+        logging.error(f"Database connection failed: {str(e)}")
+        return False
+
+# Initialize the default engine
+set_database_file(SQLITE_DB_PATH)
 
 
 # Function to list databases (SQLite has one main database)
@@ -49,8 +58,6 @@ def list_tables(database_name="main"):
 def list_columns(database_name, table_name):
     try:
         with engine.connect() as connection:
-            # PRAGMA table_info returns (cid, name, type, notnull, dflt_value, pk)
-            # The column name is at index 1 (row[1])
             result = connection.execute(
                 text(f"PRAGMA table_info('{table_name}');")
             ).fetchall()

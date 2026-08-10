@@ -5,7 +5,8 @@ import re
 from dotenv import load_dotenv
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from database import engine, list_databases, list_tables, list_columns
+import database
+from database import list_databases, list_tables, list_columns
 
 # Load environment variables
 load_dotenv()
@@ -70,7 +71,7 @@ SQL Query:
 
 def execute_query(sql_query):
     try:
-        with engine.connect() as connection:
+        with database.engine.connect() as connection:
             result = connection.execute(text(sql_query))
             rows = result.fetchall()
 
